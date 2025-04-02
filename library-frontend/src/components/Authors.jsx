@@ -13,6 +13,7 @@ const ALL_AUTHORS = gql`
 const Authors = (props) => {
   const result = useQuery(ALL_AUTHORS)
   
+  // eslint-disable-next-line react/prop-types
   if (!props.show) {
     return null
   }
