@@ -1,17 +1,22 @@
 import { useMutation, useQuery} from "@apollo/client";
 import { ALL_AUTHORS, UPDATE_AUTHOR } from "../queries";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 
 
 const Authors = (props) => {
   const result = useQuery(ALL_AUTHORS)
+  const [names, setNames] = useState([])
   const [name, setName] = useState('')
   const [born, setBorn] = useState('')
   const [updateAuthor] = useMutation(UPDATE_AUTHOR, {
     refetchQueries: [{ query: ALL_AUTHORS }]
   })
-  
+  useEffect(() => {
+    if (result.data) {
+      setNames(result.data.AllAuthors.map(a => a.name))
+    }
+  },[result])
   // eslint-disable-next-line react/prop-types
   if (!props.show) {
     return null
@@ -22,11 +27,9 @@ const Authors = (props) => {
   }
 
   const authors = result.data.AllAuthors
-
   const submit = async (event) => {
     event.preventDefault()
-    const date = Number(born)
-    updateAuthor({ variables: { name, setBornTo:date } })
+    updateAuthor({ variables: { name: name, setBornTo: Number(born) } })
     setName('')
     setBorn('')
   }
@@ -53,7 +56,9 @@ const Authors = (props) => {
       <form onSubmit={submit}>
         <div>
           name
-          <input value={name} onChange={({ target }) => setName(target.value)}/>
+          <select value={name} onChange={({target}) => setName(target.value)}>
+            {names.map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
         </div>
         <div>
           born
