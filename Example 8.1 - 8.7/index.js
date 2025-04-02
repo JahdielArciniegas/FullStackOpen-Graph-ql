@@ -58,13 +58,13 @@ const typeDefs = `
 
 const resolvers = {
   Query: {
-    BooksCount: async() => books.length,
-    AuthorsCount: async() => authors.length,
+    BooksCount: async() => Book.collection.countDocuments(),
+    AuthorsCount: async() => Author.collection.countDocuments(),
     AllBooks: async (root, args) => {
       if (args.author && args.genres) {
         return books.filter(
           (book) =>
-            book.author === args.author && book.genres.includes(args.genres)
+            book.author === args.author && Book.find({ genres : {$elemMatch : { $eq : args.genres}}})
         );
       }
 
@@ -73,37 +73,27 @@ const resolvers = {
       }
 
       if (args.genres) {
-        return books.filter((book) => book.genres.includes(args.genres));
+        return Book.find({ genres : {$elemMatch : { $eq : args.genres}}}).populate('author');
       }
 
-      return Book.find({});
+      return Book.find({}).populate('author');
     },
     AllAuthors: async() => Author.find({}),
   },
   Authors: {
-    booksCount: (root) => {
-      return books.filter((books) => books.author === root.name).length;
+    booksCount: async (root) => {
+      return Book.collection.countDocuments({ author : root.name});
     },
   },
   Mutation: {
     addBook: async (root, args) => {
-      const book = { ...args, id: uuid() };
-      if (!authors.find((author) => author.name === args.author)) {
-        authors = authors.concat({ name: args.author, id: uuid() });
-      }
-      books = books.concat(book);
-      return book;
+      const book = new Book({...args});
+      return book.save()
     },
     editAuthor: async (root, args) => {
-      const author = authors.find((author) => author.name === args.name);
-      if (!author) {
-        return null;
-      }
-      const updatedAuthor = { ...author, born: args.setBornTo };
-      authors = authors.map((author) =>
-        author.name === args.name ? updatedAuthor : author
-      );
-      return updatedAuthor;
+      const author = await Author.findOne({name : args.name})
+      author.born = args.setBornTo
+      return author.save();
     },
   },
 };
