@@ -1,6 +1,6 @@
 const { ApolloServer } = require("@apollo/server");
 const { startStandaloneServer } = require("@apollo/server/standalone");
-const { v4: uuid } = require("uuid");
+const { GraphQLError } = require("graphql");
 const mongoose = require("mongoose");
 require('dotenv').config()
 const Author = require("./models/author");
@@ -18,19 +18,18 @@ mongoose.connect(process.env.URL_MONGO_DB).then(() => {
  * Sin embargo, por simplicidad, almacenaremos el nombre del autor en conexión con el libro
  */
 
-
 const typeDefs = `
-  type Authors {
+  type Author {
     name: String!
     id: ID!
     born: Int
     booksCount: Int!
   }
   
-  type Books {
+  type Book {
     title: String!
     published: Int!
-    author: Authors!
+    author: Author!
     id: ID!
     genres: [String!]!
   }
@@ -41,20 +40,21 @@ const typeDefs = `
       published: Int!
       author: String!
       genres: [String!]!
-    ): Books
+    ): Book
     editAuthor(
       name: String!
       setBornTo: Int!
-      ):Authors
+      ):Author  
   }
 
   type Query {
     BooksCount: Int!
     AuthorsCount: Int! 
-    AllBooks(author: String, genres: String): [Books!]!
-    AllAuthors: [Authors!]!
+    AllBooks(author: String, genres: String): [Book!]!
+    AllAuthors: [Author!]!
     }
 `;
+
 
 const resolvers = {
   Query: {
@@ -80,13 +80,24 @@ const resolvers = {
     },
     AllAuthors: async() => Author.find({}),
   },
-  Authors: {
+  Author: {
     booksCount: async (root) => {
       return Book.collection.countDocuments({ author : root.name});
     },
   },
   Mutation: {
     addBook: async (root, args) => {
+      if (args.title.length < 2){
+        throw new GraphQLError('title must be longer than 2 characters')
+      }
+      if (args.author.length < 4){
+        throw new GraphQLError('name must be longer than 4 characters')
+      }
+      const author = await Author.findOne({name : args.author})
+      if (!author) {
+        const author = new Author({name : args.author})
+        await author.save()
+      }
       const book = new Book({...args});
       return book.save()
     },
