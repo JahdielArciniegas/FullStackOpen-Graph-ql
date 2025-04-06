@@ -106,7 +106,8 @@ const resolvers = {
   },
   Author: {
     booksCount: async (root) => {
-      return Book.collection.countDocuments({ author : root.name});
+      const booksWithAuthor = await Book.find({}).populate('author');
+      return booksWithAuthor.filter((book) => book.author.name === root.name).length;
     },
   },
   Mutation: {
