@@ -32,7 +32,8 @@ const Authors = (props) => {
     updateAuthor({ variables: { name: name, setBornTo: Number(born) } })
     setName('')
     setBorn('')
-  }
+  } 
+
   return (
     <div>
       <h2>authors</h2>
@@ -52,7 +53,9 @@ const Authors = (props) => {
           ))}
         </tbody>
       </table>
-      <h2>Set birthyear</h2>
+      {/*eslint-disable-next-line react/prop-types*/}
+      {!props.token ? <p>You are not logged in</p> :
+      <div><h2>Set birthyear</h2>
       <form onSubmit={submit}>
         <div>
           name
@@ -66,6 +69,8 @@ const Authors = (props) => {
         </div>
         <button type="submit">update author</button>
       </form>
+      </div>
+      }
     </div>
   )
 }
