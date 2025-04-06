@@ -3,16 +3,24 @@ import Authors from "./components/Authors";
 import Books from "./components/Books";
 import NewBook from "./components/NewBook";
 import Login from "./components/Login";
-import { useApolloClient } from "@apollo/client";
+import { useApolloClient, useQuery } from "@apollo/client";
+import Recommend from "./components/Recommend";
+import { ME } from "./queries";
 
 const App = () => {
+  const resultMe = useQuery(ME)
+  
+  
   const [token, setToken] = useState(null)
   const [page, setPage] = useState("authors");
   const client = useApolloClient()
   const handleToken = (token) => {
     setToken(token)
   }
-
+  if (resultMe.loading) {
+    return <div>loading...</div>
+  } 
+  const favoriteGenre = resultMe.data.me.favoriteGenre
   const logout = () => {
     setToken(null)
     localStorage.clear()
@@ -25,6 +33,7 @@ const App = () => {
         <button onClick={() => setPage("authors")}>authors</button>
         <button onClick={() => setPage("books")}>books</button>
         {token && <button onClick={() => setPage("add")}>add book</button>}
+        {token && <button onClick={() => setPage("recommend")}>recommend</button>}
         {!token ? <button onClick={() => setPage("login")}>login</button> : <button onClick={logout}>logout</button>}
       </div>
 
@@ -36,6 +45,7 @@ const App = () => {
 
       <Login show={page === "login"} handleToken={handleToken} token={token}/>
 
+      <Recommend show={page === "recommend"} favoriteGenre={favoriteGenre}/>
     </div>
   );
 };
