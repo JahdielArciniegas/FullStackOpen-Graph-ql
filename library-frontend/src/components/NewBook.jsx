@@ -11,7 +11,36 @@ const NewBook = (props) => {
   const [genre, setGenre] = useState('')
   const [genres, setGenres] = useState([])
 const [createBook] = useMutation(CREATE_BOOK, {
-  refetchQueries: [{query: ALL_BOOKS}, {query: ALL_AUTHORS}]
+  update: (cache, response) => {
+    const addedBook = response.data.addBook
+    addedBook.genres.forEach((g) => {
+      try {
+        cache.updateQuery(
+          {
+            query: ALL_BOOKS,
+            variables: { genre: g }
+          },
+          (data) => {
+            if (!data) return null
+
+            const alreadyIncluded = data.allBooks.some(b => b.id === addedBook.id)
+            if (alreadyIncluded) return data
+
+            return {
+              allBooks: [...data.allBooks, addedBook]
+            }
+          }
+        )
+      } catch (e) {
+        console.log(`Género ${g} aún no está en caché`)
+      }
+    })
+
+    cache.updateQuery({ query: ALL_AUTHORS }, (data) => {
+      if (!data) return null
+      return data
+    })
+  }
 })
   // eslint-disable-next-line react/prop-types
   if (!props.show) {
