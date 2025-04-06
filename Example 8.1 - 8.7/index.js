@@ -70,29 +70,18 @@ const typeDefs = `
   type Query {
     BooksCount: Int!
     AuthorsCount: Int! 
-    AllBooks(author: String, genres: String): [Book!]!
+    AllBooks( genres: String): [Book!]!
     AllAuthors: [Author!]!
     me: User
-    }
+    FilterGenres: [String!]
+  }
 `;
-
 
 const resolvers = {
   Query: {
     BooksCount: async() => Book.collection.countDocuments(),
     AuthorsCount: async() => Author.collection.countDocuments(),
     AllBooks: async (root, args) => {
-      if (args.author && args.genres) {
-        return books.filter(
-          (book) =>
-            book.author === args.author && Book.find({ genres : {$elemMatch : { $eq : args.genres}}})
-        );
-      }
-
-      if (args.author) {
-        return books.filter((book) => book.author === args.author);
-      }
-
       if (args.genres) {
         return Book.find({ genres : {$elemMatch : { $eq : args.genres}}}).populate('author');
       }
@@ -102,6 +91,9 @@ const resolvers = {
     AllAuthors: async() => Author.find({}),
     me: async (root, args, context) => {
       return context.currentUser;
+    },
+    FilterGenres: async () => {
+      return Book.collection.distinct('genres');
     }
   },
   Author: {
