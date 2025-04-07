@@ -1,24 +1,26 @@
-const { ApolloServer } = require("@apollo/server");
-const { startStandaloneServer } = require("@apollo/server/standalone");
-const { GraphQLError } = require("graphql");
-const mongoose = require("mongoose");
-require('dotenv').config()
-const Author = require("./models/author");
-const User = require("./models/user");
-const Book = require("./models/book");
-const jwt = require("jsonwebtoken")
+import { ApolloServer } from "@apollo/server";
+import http from "http";
+import { GraphQLError } from "graphql";
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import Author from "./models/author.js";
+import User from "./models/user.js";
+import Book from "./models/book.js";
+import jwt from "jsonwebtoken"
+import { PubSub } from "graphql-subscriptions";
+import { makeExecutableSchema } from "@graphql-tools/schema";
+const pubsub = new PubSub();
+import { startStandaloneServer } from "@apollo/server/standalone";
+import { useServer } from "graphql-ws/use/ws";
+import { WebSocketServer } from "ws";
+
+dotenv.config();
 
 mongoose.connect(process.env.URL_MONGO_DB).then(() => {
   console.log('Connected to MongoDB')
 }).catch((error) => {
   console.log("Error connecting to MongoDB",error.message)
 })
-
-/*
- * Spanish:
- * Podría tener más sentido asociar un libro con su autor almacenando la id del autor en el contexto del libro en lugar del nombre del autor
- * Sin embargo, por simplicidad, almacenaremos el nombre del autor en conexión con el libro
- */
 
 const typeDefs = `
   type User {
@@ -65,6 +67,10 @@ const typeDefs = `
       username: String!
       password: String!
     ): Token
+  }
+
+  type Subscription {
+    bookAdded: Book!
   }
 
   type Query {
@@ -143,6 +149,7 @@ const resolvers = {
         await author.save()
       }
       const book = new Book({...args});
+      pubsub.publish('BOOK_ADDED', { bookAdded: book })
       return book.save()
     },
     editAuthor: async (root, args, { currentUser}) => {
@@ -154,26 +161,55 @@ const resolvers = {
       return author.save();
     },
   },
+  Subscription: {
+    bookAdded: {
+      subscribe: () => pubsub.asyncIterator(['BOOK_ADDED'])
+    }
+  }
 };
 
-const server = new ApolloServer({
+const schema = makeExecutableSchema({
   typeDefs,
   resolvers,
 });
 
-startStandaloneServer(server, {
-  listen: { port: 4000 },
-  context: async ({ req, res }) => {
+const httpServer = http.createServer()
+const server = new ApolloServer({
+  schema,
+  context: async({req}) => {
     const auth = req ? req.headers.authorization : null
     if (auth && auth.startsWith('Bearer ')) {
       const decodedToken = jwt.verify(
         auth.substring(7), process.env.SECRET
       )
-      const currentUser = await User
-        .findById(decodedToken.id)
-      return { currentUser }
+      const currentUser = await User.findById(decodedToken.id)
+      return { currentUser, pubsub }
     }
+    return { pubsub }
   }
-}).then(({ url }) => {
-  console.log(`Server ready at ${url}`);
 });
+
+const start = async () => {
+  const {url} = await startStandaloneServer(server, {
+    listen: {port:4000},
+    server: httpServer
+  })
+  await server.start()
+  console.log(`🚀 HTTP server ready at ${url}`)
+
+  const wsServer = new WebSocketServer({
+    server: httpServer,
+    path: '/graphql'
+  })
+
+  useServer({schema,context: async() => ({pubsub})}, wsServer)
+
+  console.log(`📡 Subscriptions ready at ws://localhost:4000/graphql`)
+}
+
+start()
+
+
+
+
+
